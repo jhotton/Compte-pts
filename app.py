@@ -9,7 +9,7 @@ st.title("🏆 Compteur de Points")
 # 1. Configuration dans la barre latérale
 with st.sidebar:
     st.header("Paramètres")
-        nb_joueurs = st.number_input("Nombre de joueurs", min_value=1, max_value=20, value=2)
+    nb_joueurs = st.number_input("Nombre de joueurs", min_value=1, max_value=20, value=2)
             
                 # Initialisation ou mise à jour du nombre de joueurs
                     if 'scores' not in st.session_state or len(st.session_state.scores) != nb_joueurs:
