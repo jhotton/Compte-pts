@@ -3,33 +3,34 @@ import pandas as pd
 from datetime import datetime
 
 # 1. Configuration
-st.set_page_config(page_title="Score Live", layout="wide")
+st.set_page_config(page_title="Score Flexible", layout="wide")
 
-# 2. CSS (Visibilité et format compact)
+# 2. CSS optimisé
 st.markdown("""
     <style>
-    .block-container { padding-top: 2rem !important; }
+    .block-container { padding-top: 2rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
     .joueur-header {
-        text-align: center; font-size: 13px; font-weight: bold;
+        text-align: center; font-size: 12px; font-weight: bold;
         color: #FF4B4B !important; margin-bottom: 2px;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .score-box {
-        text-align: center; font-size: 24px; font-weight: 800;
+        text-align: center; font-size: 22px; font-weight: 800;
         background-color: #262730; border-radius: 5px;
-        padding: 5px 0px; margin-bottom: 5px; border: 1px solid #444;
+        padding: 4px 0px; margin-bottom: 5px; border: 1px solid #444;
     }
-    div.stButton > button { height: 2.2em !important; }
+    div.stButton > button { height: 2.2em !important; padding: 0px !important; }
+    /* Réduction de l'espace entre les colonnes */
+    [data-testid="column"] { padding: 0px 5px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Initialisation de l'état
+# 3. Initialisation
 if 'scores' not in st.session_state:
-    st.session_state.scores = {"J1": 0, "J2": 0, "J3": 0, "J4": 0}
+    st.session_state.scores = {"J1": 0, "J2": 0, "J3": 0, "J4": 0, "J5": 0, "J6": 0}
 if 'historique' not in st.session_state:
     st.session_state.historique = []
 
-# 4. Fonctions de mise à jour
 def enregistrer_action(joueur, points):
     if points == 0: return
     st.session_state.scores[joueur] += points
@@ -44,34 +45,29 @@ def update_from_input(joueur):
         enregistrer_action(joueur, val)
         st.session_state[f"input_{joueur}"] = 0
 
-# --- BARRE LATÉRALE (GESTION DES NOMS) ---
+# --- BARRE LATÉRALE ---
 with st.sidebar:
     st.header("⚙️ Configuration")
     
-    # Étape A : Nombre de joueurs
-    noms_actuels = list(st.session_state.scores.keys())
-    nb = st.number_input("Nombre de joueurs", 1, 20, len(noms_actuels))
+    # NOUVEAU : Réglage de la grille
+    st.subheader("Affichage")
+    cols_par_ligne = st.slider("Joueurs par ligne", 1, 8, 4)
     
-    # Étape B : Saisie des noms
+    st.divider()
+    noms_actuels = list(st.session_state.scores.keys())
+    nb = st.number_input("Nombre total de joueurs", 1, 24, len(noms_actuels))
+    
     nouveaux_scores = {}
-    st.write("---")
-    st.subheader("Noms des joueurs")
     for i in range(nb):
-        # On essaie de récupérer le nom existant, sinon on crée "J+1"
         nom_par_defaut = noms_actuels[i] if i < len(noms_actuels) else f"J{i+1}"
         nouveau_nom = st.text_input(f"Joueur {i+1}", value=nom_par_defaut, key=f"edit_name_{i}")
-        
-        # On transfère le score de l'ancien nom vers le nouveau
-        score_existant = st.session_state.scores.get(nom_par_defaut, 0)
-        nouveaux_scores[nouveau_nom] = score_existant
+        nouveaux_scores[nouveau_nom] = st.session_state.scores.get(nom_par_defaut, 0)
 
-    # Étape C : Application des changements
-    if st.button("Valider les noms/nombre", use_container_width=True):
+    if st.button("Appliquer les changements", use_container_width=True):
         st.session_state.scores = nouveaux_scores
         st.rerun()
     
-    st.write("---")
-    if st.button("🗑️ Reset Scores & Historique", use_container_width=True):
+    if st.button("🗑️ Reset Scores", use_container_width=True):
         for j in st.session_state.scores: st.session_state.scores[j] = 0
         st.session_state.historique = []
         st.rerun()
@@ -79,16 +75,16 @@ with st.sidebar:
 # --- INTERFACE PRINCIPALE ---
 st.title("🏆 Scores")
 
-# Grille de score (4 colonnes)
-cols = st.columns(4)
+# Grille dynamique
 joueurs = list(st.session_state.scores.keys())
+cols = st.columns(cols_par_ligne)
 
 for index, joueur in enumerate(joueurs):
-    with cols[index % 4]:
+    # On place le joueur dans la colonne correspondante (boucle modulo)
+    with cols[index % cols_par_ligne]:
         st.markdown(f'<p class="joueur-header">{joueur}</p>', unsafe_allow_html=True)
         st.markdown(f'<div class="score-box">{st.session_state.scores[joueur]}</div>', unsafe_allow_html=True)
         
-        # Boutons rapides
         c1, c2 = st.columns(2)
         if c1.button("＋", key=f"p_{joueur}", use_container_width=True):
             enregistrer_action(joueur, 1)
@@ -97,7 +93,6 @@ for index, joueur in enumerate(joueurs):
             enregistrer_action(joueur, -1)
             st.rerun()
 
-        # Saisie directe
         st.number_input(
             "Pts", value=0, step=1, key=f"input_{joueur}", 
             label_visibility="collapsed", on_change=update_from_input, args=(joueur,)
@@ -105,7 +100,7 @@ for index, joueur in enumerate(joueurs):
 
 st.divider()
 
-# --- HISTORIQUE & CLASSEMENT ---
+# --- BAS DE PAGE ---
 col_h, col_c = st.columns(2)
 with col_h:
     st.subheader("🕒 Historique")
