@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# 1. Configuration (Toujours en haut)
-st.set_page_config(page_title="Score Ultra-Fast", layout="wide")
+# 1. Configuration
+st.set_page_config(page_title="Score Live", layout="wide")
 
-# 2. CSS pour stabiliser l'affichage
+# 2. CSS (Maintien de la visibilité et du format compact)
 st.markdown("""
     <style>
     .block-container { padding-top: 2rem !important; }
@@ -18,83 +18,84 @@ st.markdown("""
         background-color: #262730; border-radius: 5px;
         padding: 5px 0px; margin-bottom: 5px; border: 1px solid #444;
     }
-    div.stButton > button { height: 2.5em !important; }
+    div.stButton > button { height: 2.2em !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Initialisation des données
+# 3. Initialisation
 if 'scores' not in st.session_state:
     st.session_state.scores = {"J1": 0, "J2": 0, "J3": 0, "J4": 0}
 if 'historique' not in st.session_state:
     st.session_state.historique = []
 
+# 4. Fonctions de mise à jour
 def enregistrer_action(joueur, points):
+    if points == 0: return
+    st.session_state.scores[joueur] += points
     temps = datetime.now().strftime("%H:%M")
     signe = "+" if points >= 0 else ""
     st.session_state.historique.insert(0, f"{temps} | {joueur} ({signe}{points})")
     st.session_state.historique = st.session_state.historique[:5]
 
-# 4. Le Fragment : La magie est ici
-@st.fragment
-def grille_de_score():
-    cols = st.columns(4)
-    joueurs = list(st.session_state.scores.keys())
-    
-    for index, joueur in enumerate(joueurs):
-        with cols[index % 4]:
-            st.markdown(f'<p class="joueur-header">{joueur}</p>', unsafe_allow_html=True)
-            st.markdown(f'<div class="score-box">{st.session_state.scores[joueur]}</div>', unsafe_allow_html=True)
-            
-            # Boutons rapides
-            c1, c2 = st.columns(2)
-            if c1.button("＋", key=f"p_{joueur}", use_container_width=True):
-                st.session_state.scores[joueur] += 1
-                enregistrer_action(joueur, 1)
-                st.rerun(scope="fragment") # Relance uniquement cette fonction
-            
-            if c2.button("－", key=f"m_{joueur}", use_container_width=True):
-                st.session_state.scores[joueur] -= 1
-                enregistrer_action(joueur, -1)
-                st.rerun(scope="fragment")
+def update_from_input(joueur):
+    # Récupérer la valeur saisie via sa clé unique
+    val = st.session_state[f"input_{joueur}"]
+    if val != 0:
+        enregistrer_action(joueur, val)
+        # On remet le champ de saisie à 0 après validation
+        st.session_state[f"input_{joueur}"] = 0
 
-            # Saisie libre
-            val = st.number_input("Pts", step=1, key=f"v_{joueur}", label_visibility="collapsed")
-            if st.button("OK", key=f"ok_{joueur}", use_container_width=True):
-                st.session_state.scores[joueur] += val
-                enregistrer_action(joueur, val)
-                st.rerun(scope="fragment")
+# --- INTERFACE PRINCIPALE ---
+st.title("🏆 Scores en Direct")
 
-# --- AFFICHAGE PRINCIPAL ---
+# Grille de score
+cols = st.columns(4)
+joueurs = list(st.session_state.scores.keys())
 
-st.title("🏆 Scores")
+for index, joueur in enumerate(joueurs):
+    with cols[index % 4]:
+        st.markdown(f'<p class="joueur-header">{joueur}</p>', unsafe_allow_html=True)
+        st.markdown(f'<div class="score-box">{st.session_state.scores[joueur]}</div>', unsafe_allow_html=True)
+        
+        # Boutons rapides +1 / -1
+        c1, c2 = st.columns(2)
+        if c1.button("＋", key=f"p_{joueur}", use_container_width=True):
+            enregistrer_action(joueur, 1)
+            st.rerun()
+        if c2.button("－", key=f"m_{joueur}", use_container_width=True):
+            enregistrer_action(joueur, -1)
+            st.rerun()
 
-# Appel du fragment
-grille_de_score()
+        # Saisie directe (se valide dès qu'on appuie sur Entrée ou qu'on change de champ)
+        st.number_input(
+            "Pts", 
+            value=0, 
+            step=1, 
+            key=f"input_{joueur}", 
+            label_visibility="collapsed",
+            on_change=update_from_input, 
+            args=(joueur,)
+        )
 
 st.divider()
 
-# Section Historique et Classement (se mettront à jour au prochain refresh global ou manuel)
+# --- HISTORIQUE & CLASSEMENT (Mise à jour instantanée) ---
 col_h, col_c = st.columns(2)
 with col_h:
-    st.caption("🕒 Historique (5 derniers)")
+    st.subheader("🕒 Historique")
     for item in st.session_state.historique:
         st.write(item)
 
 with col_c:
-    with st.expander("🏆 Classement complet"):
-        classement = sorted(st.session_state.scores.items(), key=lambda x: x[1], reverse=True)
-        for i, (n, s) in enumerate(classement):
-            st.write(f"**{n}**: {s}")
+    st.subheader("📊 Classement")
+    classement = sorted(st.session_state.scores.items(), key=lambda x: x[1], reverse=True)
+    for i, (n, s) in enumerate(classement):
+        st.write(f"**{i+1}. {n}** : {s} pts")
 
-# --- BARRE LATÉRALE ---
+# Barre latérale pour la gestion
 with st.sidebar:
     st.header("⚙️ Configuration")
-    if st.button("🔄 Refresh global / Classement"):
-        st.rerun()
-    
-    st.divider()
-    nb = st.number_input("Nombre de joueurs", 1, 20, len(st.session_state.scores))
-    if st.button("Réinitialiser avec ce nombre"):
-        st.session_state.scores = {f"J{i+1}": 0 for i in range(nb)}
+    if st.button("🔄 Réinitialiser la partie", use_container_width=True):
+        st.session_state.scores = {joueur: 0 for joueur in st.session_state.scores}
         st.session_state.historique = []
         st.rerun()
